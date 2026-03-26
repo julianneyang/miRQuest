@@ -6979,7 +6979,7 @@
       "checksum": "b7499691d8f35e24e40783aaba90f7b8"
     },
     "manifest.json": {
-      "checksum": "0e9016b1cfa603bb274660ffe884e3b4"
+      "checksum": "8e430898e0801359f9ec68e9a71550ad"
     },
     "mir_quest_workflow_diagram.jpeg": {
       "checksum": "7afe813aa24655873569d8618ad2da32"
@@ -7009,7 +7009,7 @@
       "checksum": "6cd60c0556d6006b31934abf8feeebf6"
     },
     "renv.lock": {
-      "checksum": "5d8e17ddf70b4e18465b1f74aeae0ead"
+      "checksum": "f79cbe7acefb5a4b32472c83518c1056"
     },
     "renv.lock.backup": {
       "checksum": "6cd60c0556d6006b31934abf8feeebf6"
