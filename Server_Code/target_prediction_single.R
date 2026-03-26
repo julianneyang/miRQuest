@@ -297,18 +297,18 @@ observeEvent(input$runORA_single_miRNA, {
   ### BACKGROUND SELECTION ---
   scope <- input$result_scope_all
   
-  if (identical(input$select_background, "Organism_all")) { # CHANGE: new explicit option
+  if (identical(input$select_background_single, "Organism_all")) { # CHANGE: new explicit option
     background_genes <- keys(org_db(), keytype = "ENTREZID")
     
-  } else if (identical(input$select_background, "Custom_list")) { # CHANGE: new custom input option
+  } else if (identical(input$select_background_single, "Custom_list")) { # CHANGE: new custom input option
     # Expect a textInput where users paste comma-separated ENTREZ IDs, e.g., input$custom_universe_ids
-    custom_str <- input$custom_universe_ids %||% ""
+    custom_str <- input$single_custom_universe_ids %||% ""
     # Parse comma-separated list safely
     background_genes <- if (nzchar(custom_str)) {
       trimws(unlist(strsplit(custom_str, ",")))
     } else character(0)
     
-  } else if (identical(input$select_background, "Validated_universe") && identical(scope, "validated")) { # CHANGE: conditional validated universe
+  } else if (identical(input$select_background_single, "Validated_universe") && identical(scope, "validated")) { # CHANGE: conditional validated universe
     # Build universe from all miRTarBase targets (across organism), using ENTREZ IDs
     mtb <- org_mirtarbase()
     # Ensure column name matches exactly "entrezgene_id" in your miRTarBase table

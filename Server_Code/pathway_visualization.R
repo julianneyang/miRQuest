@@ -44,47 +44,21 @@ observeEvent(input$showChordPlot,{
   })
   
   chord_plot_reactive(chord_plot)
+  
+  #################### NEW 2026 #####################
+  chord_data_reactive(filtered_data)
+  
+  output$downloadChordData <- downloadHandler(
+    filename = function() {
+      paste0("chordplot_data_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      df <- chord_data_reactive()
+      req(df)
+      readr::write_csv(df, file)
+    }
+  )
 })
-
-# observeEvent(input$showNetworkPlot, {
-#   req(miRNA_mapped_pathways())
-#   chord_data <- miRNA_mapped_pathways() %>% 
-#     dplyr::select(c("miRNA", "description", "enrichment", "coverage")) %>%
-#     unique()
-#   
-#   top_pathways <- All_miRNA_Pathways_reactive() %>% 
-#     as.data.frame() %>% 
-#     arrange(qvalue) %>% 
-#     slice_head(n = input$num_pathways) %>%
-#     pull(Description)
-#   
-#   filtered_data <- chord_data %>%
-#     filter(description %in% top_pathways) %>% 
-#     filter(coverage >= input$min_coverage)
-#   
-#   edges <- filtered_data[, c("miRNA", "description")]
-#   
-#   g <- graph_from_data_frame(edges, directed = FALSE)
-#   
-#   node_colors <- data.frame(name = V(g)$name,
-#                             type = ifelse(V(g)$name %in% filtered_data$miRNA, "miRNA", "description"))
-#   
-#   V(g)$color <- ifelse(node_colors$type == "miRNA", "lightblue", "purple")
-#   
-#   set.seed(123)
-#   plot <- ggraph(g, layout = "fr") + 
-#     geom_edge_link(color = "grey") +
-#     geom_node_point(aes(color = color), size = 5) +
-#     geom_node_text(aes(label = name), repel = TRUE) +
-#     scale_color_identity() +
-#     theme_graph(fg_text_colour = 'white')
-#   
-#   output$networkPlot <- renderPlot({
-#     plot
-#   })
-#   
-#   network_plot_reactive(plot)
-# })
 
 observeEvent(input$showNetworkPlot, {
   req(miRNA_mapped_pathways(), All_miRNA_Pathways_reactive())
@@ -177,6 +151,9 @@ observeEvent(input$showNetworkPlot, {
                      paste0("<b>Pathway:</b> ", label, "<br><b>Degree (shown):</b> ", degree))
     )
   
+  # store exactly what will be plotted
+  path_network_displayed(list(nodes = nodes, edges = edges))
+  
   # Render interactive network
   output$networkPlot <- visNetwork::renderVisNetwork({
     visNetwork::visNetwork(nodes, edges, height = "700px", width = "100%") %>%
@@ -197,7 +174,23 @@ observeEvent(input$showNetworkPlot, {
       visNetwork::visIgraphLayout(randomSeed = 123)  # FR-like layout
   })
   
-  # to store the widget for reuse
-  #network_plot_reactive(NULL)  # or store nodes/edges if you need them elsewhere
+  ################################# NEW 2026 ######################################
+  output$path_dl_network_nodes <- downloadHandler(
+    filename = function() paste0("displayed_network_nodes_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(path_network_displayed()$nodes)
+      readr::write_csv(path_network_displayed()$nodes, file)
+    }
+  )
+  
+  output$path_dl_network_edges <- downloadHandler(
+    filename = function() paste0("displayed_network_edges_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(path_network_displayed()$edges)
+      readr::write_csv(path_network_displayed()$edges, file)
+    }
+  )
+  ##################################################################################
+  
 })
 

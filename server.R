@@ -171,7 +171,9 @@ server <- function(input, output, session) {
   DESEQ_obj <- reactiveVal()
   DE_miRNA_results_reactive <- reactiveVal()
   res_significant <- reactiveVal()
-  norm_cts_reactive <- reactiveVal()
+  vst_cts_reactive <- reactiveVal()
+  significant_heatmap_reactive <- reactiveVal()
+  heatmap_mat_plotted_reactive <- reactiveVal()
   heatmap_annotation_reactive <- reactiveVal()
   mirna_data_reactive <- reactiveVal()
   
@@ -181,12 +183,17 @@ server <- function(input, output, session) {
   downregulated_miRNA_genes_reactive <- reactiveVal()
   upregulated_miRNA_reactive <- reactiveVal()
   downregulated_miRNA_reactive <- reactiveVal()
+  
   All_miRNA_Pathways_reactive <- reactiveVal()
   miRNA_mapped_pathways <- reactiveVal()
   
+  chord_data_reactive <- reactiveVal()
+  
+  network_displayed <- reactiveVal(list(nodes = NULL, edges = NULL))
+  path_network_displayed <- reactiveVal(list(nodes = NULL, edges = NULL))
+  
   # Module 5: Predict target genes for a single DE miRNA
   displayed_gene_results <- reactiveVal()
-  #Single_miRNA_PredictedGenes_reactive <- reactiveVal()
   Single_miRNA_Pathways_reactive <- reactiveVal()
   
   # Module 6: Do Differential Gene Expression Analysis with DESEQ2
@@ -197,6 +204,8 @@ server <- function(input, output, session) {
   # Module 7: miRNA-mRNA Correlation Analysis
   neg_cor_reactive <- reactiveVal()
   supported_neg_cor_reactive <- reactiveVal()
+  cor_results_reactive <- reactiveVal()
+  global_cor_perm_result <- reactiveVal()
   
   vis_nodes_reactive <- reactiveVal()
   vis_edges_reactive <- reactiveVal()
@@ -204,6 +213,10 @@ server <- function(input, output, session) {
   corr_miRNA_Pathways_reactive <- reactiveVal()
   corr_miRNA_mapped_pathways_reactive <- reactiveVal()
   corr_chord_plot_reactive <- reactiveVal() 
+  corr_chord_data_reactive <- reactiveVal()
+  
+  corr_network_displayed <- reactiveVal(list(nodes = NULL, edges = NULL))
+  path_corr_network_displayed <- reactiveVal(list(nodes = NULL, edges = NULL))
   
   # Species validation observer
   observeEvent(input$submit, {

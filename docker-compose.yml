@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: mirquest:latest
+    image: mirquest:v1.0.0
     container_name: mirquest-app
     ports:
       - "3838:3838"

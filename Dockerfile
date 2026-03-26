@@ -4,9 +4,12 @@ FROM bioconductor/bioconductor_docker:RELEASE_3_20
 # Metadata labels
 LABEL org.opencontainers.image.title="miRQuest"
 LABEL org.opencontainers.image.description="miRQuest - Interactive microRNA Analysis Shiny Application"
+LABEL org.opencontainers.image.version="1.0.0"
 LABEL org.opencontainers.image.authors="Julianne Yang <juliannecyang@gmail.com>, Jake Sauter <jake.sauter3@gmail.com>"
 LABEL org.opencontainers.image.source="https://github.com/MSDLLCpapers/miRQuest"
 LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.ref.name="mirquest_v1.0.0"
+LABEL org.opencontainers.image.documentation="Associated with: Yang & Sauter et al., 'MiRQuest: A user-friendly web app for the interactive analysis and visualization of microRNA sequencing data'"
 
 # Set working directory
 WORKDIR /app

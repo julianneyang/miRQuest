@@ -2,7 +2,6 @@
 
 ui <- fluidPage(
   useShinyjs(),
-  #useBusyIndicators(spinners=FALSE,pulse=FALSE,fade=TRUE),
   titlePanel("miRQuest: Interactive Analysis of MicroRNA Sequencing Data"),
   theme=bs_theme(version=5, bootswatch = "cosmo"),
   
@@ -51,6 +50,37 @@ ui <- fluidPage(
         column(8, actionButton("submit", "Submit")),  # Submit button
         column(7, textOutput("error_message"))  # Error message next to the button
       ),
+      tags$hr(),
+      # Download options UI ----
+      selectInput(
+        "plot_format",
+        "Download format (can change on per-plot basis):",
+        choices = c(
+          "PNG"       = "png",
+          "TIFF" = "tiff",
+          "PDF"       = "pdf",
+          "EPS"       = "eps",
+          "SVG"       = "svg"
+        ),
+        selected = "png"
+      ),
+      numericInput(
+        "plot_width",
+        "Plot width (pixels):",
+        value = 800,
+        min   = 400,
+        max   = 4000,
+        step  = 100
+      ),
+      numericInput(
+        "plot_height",
+        "Plot height (pixels):",
+        value = 600,
+        min   = 300,
+        max   = 4000,
+        step  = 100
+      ),
+      
       width=3
     ),
     
@@ -64,7 +94,7 @@ ui <- fluidPage(
                 div(
                   style = "margin-top: 10px; margin-bottom: 10px; color: #555;",
                   strong("Maintained as of: "),
-                  span("2025-12-03")  
+                  span("2026-03-10")  
                   )
                 )
             ),
@@ -124,15 +154,27 @@ ui <- fluidPage(
                 )
               )
             ),
+            hr(), 
+            fluidRow(
+              column(
+                width = 12,
+                h3("Walkthrough Tutorial Using the Demo Data"),
+                p("Please see the following tutorial for more help"),
+                tags$iframe(
+                  src = "MiRQuest_tutorial.pdf",
+                  style = "width:100%; height:600px; border:none;"
+                )
+              )
+            ),
             hr(),
             fluidRow(
               column(
                 width = 12,
                 h3("Manuscript"),
                 p("To see an application of miRQuest and interpretation of results, please see the following paper:"),
-                p("Paper TBD"),
-                p("If you use miRQuest in your work, please cite:"),
-                p("Citation TBD")
+                p("Yang JC, Sauter J, Adam G, Carr R. MiRQuest: An Interactive App for MiRNA Sequencing Analysis. in revision at BMC Bioinformatics."),
+                p("If you use miRQuest in your work, please cite both the paper and the source code:"),
+                p("Zenodo placeholder")
               )
             )
           )
@@ -140,14 +182,15 @@ ui <- fluidPage(
         
         tabPanel("Exploratory Visualization",
                  selectInput("groupBy", "Select Metadata Column to Group Plots", choices = NULL),
-                 #card(card_header("card1"),
+                 helpText("You must select a column that encodes groups containing > 1 sample for the heatmap and volcano plots, e.g. not SampleID."),
+                 tags$hr(),
                  fluidRow(
                    column(4,
                     checkboxInput("meanToggle", "Calculate Mean Relative Abundance", value = FALSE),  
                    ),
-                   column(8,
-                     helpText("Summarizing by the mean works best for categorical variables with multiple samples represented at each level. Please click the below button to re-calculate."),
-                   )
+                   column(8, 
+                          helpText("For the stacked column charts, if you are constrained by the space available, please try subsetting the data or shorten your SampleIDs.")
+                          ),
                  ),
                  actionButton("plotButton", "Show miRnome as Stacked Column Chart"),
                  sliderInput("percentageFilter", 
@@ -257,6 +300,7 @@ ui <- fluidPage(
                    )
                  ),
                  downloadButton("downloadBoxplot", "Download Plot"),
+                 downloadButton("download_plotCounts_selected", "Download Data"),
                  tags$hr(),
                  h6("The following Log2FoldChange filter affects both the volcano and heatmap plots. Click the button to redraw the plots."),
                  numericInput("DEM_log2FoldChange_filter", "Absolute Log2 Fold Change Threshold", 
@@ -310,6 +354,8 @@ ui <- fluidPage(
                  ),
                  plotOutput("significant_miRNA_heatmap"),
                  downloadButton("downloadSignificantHeatmap", "Download Plot"),
+                 downloadButton("download_heatmap_matrix", "Download Data"),
+                 
                  tags$hr(),
                  # future_expansion_code: DE miRNA data table for debugging/correlation analysis
                  # h5("DE miRNA Data for Correlation Analysis:"),
@@ -370,7 +416,7 @@ ui <- fluidPage(
                    ),
                    column(6, 
                 # Background universe selector
-                     selectInput("select_background", "Background universe for ORA",
+                     selectInput("select_background_single", "Background universe for ORA",
                        choices = c(
                          "Organism_all",          # all ENTREZ IDs in OrgDb
                          "Custom_list",           # user-entered comma-separated ENTREZ IDs
@@ -405,7 +451,7 @@ ui <- fluidPage(
                      conditionalPanel(
                        condition = "input.select_background == 'Custom_list'",
                        textInput(
-                         "custom_universe_ids",
+                         "single_custom_universe_ids",
                          "Custom universe (comma-separated ENTREZ IDs)",
                          placeholder = "e.g., 7157, 1956, 7422"
                        ),
@@ -495,6 +541,8 @@ ui <- fluidPage(
                  ),
                  actionButton("showGeneNetwork", "Show miRNA–Gene Network"),
                  visNetworkOutput("miRNAGeneNetwork", height = "700px"),
+                 downloadButton("dl_network_nodes", "Download nodes"),
+                 downloadButton("dl_network_edges", "Download edges"),
                  ################################################################################
                  
                  tags$hr(),
@@ -572,7 +620,7 @@ ui <- fluidPage(
                  numericInput("num_pathways", "Maximum Number of Pathways to Show:", value = 10, min = 2),
                  h6("Coverage indicates the minimum fraction of genes in a pathway an miRNA must target to be shown."),
                  numericInput("min_coverage", "Minimum Coverage (0 to 1):", value = 0.1, min = 0, max = 1, step = 0.01),
-                 #absolutePanel(draggable=TRUE,
+
                  tags$hr(),
                  actionButton("showChordPlot", "Show Chord Plot"),
                  tags$div(
@@ -580,10 +628,13 @@ ui <- fluidPage(
                     plotOutput("chordPlot", width = "100%", height = "600px")
                  ),
                  downloadButton("downloadChord", "Download Plot"),
+                 downloadButton("downloadChordData", "Download Data"),
                  numericInput("path_min_degree", "Minimum node degree: This will enable you to show only nodes that have at least n number connections", value = 1, min = 0),
                  
                  actionButton("showNetworkPlot", "Show Network Plot"),
                  visNetworkOutput("networkPlot", height = "700px"),
+                 downloadButton("path_dl_network_nodes", "Download nodes"),
+                 downloadButton("path_dl_network_edges", "Download edges"),
 
         ),
         tabPanel("Differential Gene Expression Analysis",
@@ -598,6 +649,9 @@ ui <- fluidPage(
         ),
         
         tabPanel("miRNA - Gene correlation analysis",
+                 h6("Pairwise miRNA-gene Correlations"),
+                 helpText("Computes pairwise correlations for all selected DE miRNAs and DE genes. Runtime increases with the number of features (miRNAs × genes). CAUTION: Please heed the numbers of miRNA and genes below (for #### x ### features, this can take 30 minutes)"),
+                 
                  fluidRow(
                    column(4, numericInput("filter_DEG_correlation", "mRNA Log2 Fold Change Threshold", 
                                           value = 1, min = 0, step = 0.1)),
@@ -611,12 +665,25 @@ ui <- fluidPage(
                  downloadButton("downloadNegCor", "Download Significant Negative Correlations"),
                  helpText("Please note that we will pass all miRNA-gene pairs with Spearman rho < 0 regardless of significance threshold to subsequent modules below, and we have filtered only the downloadable results to the specified threshold for your convenience."),
                  DTOutput("NegativeCorrelationTable"),
+                 #tableOutput("NegativeCorrelationTable"),
                  tags$hr(),
+                 ####################################################### NEW 2026 ###############################################
+                 h6("Optional global permutation test of negative correlations"),
+                 helpText("Tests whether the overall number of significantly negative miRNA–mRNA correlations reported above is higher than expected by chance. CAUTION: Runtime will be (number of permutations) x (length of time for the pairwise correlations above)!!! "),
+                 
+                 numericInput("n_perm_correlation", "Number of permutations", value = 100, min = 10, step = 50),
+                 
+                 actionButton("runGlobalPermutation", "Run global permutation test"),
+                 
+                 verbatimTextOutput("GlobalPermutationSummary"),
+                 tags$hr(),
+                 #################################################################################################################
                  actionButton("show_database_support", "See Correlations with Database Support"), 
                  helpText("This will identify the intersection of negatively correlated miRNA-gene pairs (whether significant or not) with targets retrieved for all DE miRNA."),
                  textOutput("degMessage"),
                  downloadButton("downloadsupportednegcor", "Download Supported Negative Correlations"),
                  DTOutput("SupportedNegativeCorrelationTable"),
+                 #tableOutput("SupportedNegativeCorrelationTable"),
                  tags$hr(),
                  h6("The following controls affect both the correlation and network plots. To redraw the plots, click the button again"),
                  checkboxInput("select_supported_only", 
@@ -659,6 +726,8 @@ ui <- fluidPage(
                  ),
                  actionButton("showGeneNetwork_Experimental", "Show miRNA–Gene Network"),
                  visNetworkOutput("miRNAGeneNetwork_Experimental", height = "700px"),
+                 downloadButton("corr_dl_network_nodes", "Download nodes"),
+                 downloadButton("corr_dl_network_edges", "Download edges"),
                  tags$hr(),
                  
                  ###################################### NEW CHANGES #####################################
@@ -747,14 +816,29 @@ ui <- fluidPage(
                      
                    ),
                    column(2,
-                          selectInput("analysis_type", "Select Pathway Database",
+                          selectInput("corr_analysis_type", "Select Pathway Database",
                                       choices = c("GO" = "GO", "Reactome" = "Reactome"),
                                       selected = "Reactome")
                    ),
                    column(2, numericInput("corr_pathway_padj_cutoff", "FDR-adjusted P-value < ", value = 0.05, min = 0, max = 1, step = 0.01))
                  ),
+                 fluidRow(
+                   column(12,
+                          # Show custom input only when Custom_list is selected
+                          conditionalPanel(
+                            condition = "input.corr_select_background == 'Custom_list'",
+                            textInput(
+                              "custom_universe_ids",
+                              "Custom universe (comma-separated ENTREZ IDs)",
+                              placeholder = "e.g., 7157, 1956, 7422"
+                            ),
+                            helpText("Paste ENTREZ gene IDs separated by commas. The analysis will test enrichment against this custom background.")
+                          )
+                   )
+                 ),
                  actionButton("Pathway_ORA_Experimental", "Run Pathway Overrepresentation Analysis"),
                  DTOutput("corr_pathway_ORA_table"),
+                 #tableOutput("corr_pathway_ORA_table"),
                  # New inputs for user-defined parameters
                  tags$hr(),
                  h6("The following max. pathway and min. coverage controls affect both the chord and network plots."),
@@ -769,14 +853,18 @@ ui <- fluidPage(
                    style = "overflow: visible; width: 100%; height: 600px;",
                    plotOutput("corr_chordPlot", width = "100%", height = "600px")),
                  downloadButton("corr_downloadChord", "Download Plot"),
+                 downloadButton("corr_downloadChordData", "Download Data"),
                  h6("This will enable you to show only nodes that have at least n number connections"),
                  numericInput("corr_min_degree", "Minimum node degree:", value = 1, min = 0),
                  actionButton("corr_showNetworkPlot", "Show Network Plot"),
-                 # plotOutput("networkPlot"),
-                 visNetworkOutput("corr_networkPlot", height = "700px")
+                 visNetworkOutput("corr_networkPlot", height = "700px"),
+                 downloadButton("path_corr_dl_network_nodes", "Download nodes"),
+                 downloadButton("path_corr_dl_network_edges", "Download edges")
                  ###############################################################################
         )
       )
     )
   )
 )
+
+

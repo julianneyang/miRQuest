@@ -197,7 +197,7 @@ observeEvent(input$MDSButton, {
         scale_fill_viridis_d(name="")
     }
     
-    print(plot) 
+    print(plot)
     
     # Store in reactive for download handler
     mds_xy_reactive(mds_xy)
@@ -337,10 +337,17 @@ observeEvent(input$heatmapButton, {
   # Download handler for heatmap
   output$downloadHeatmap <- downloadHandler(
     filename = function() {
-      paste("exploratory_heatmap_", Sys.Date(), ".png", sep = "")
+      fmt <- input$plot_format
+      paste0("exploratory_heatmap_", Sys.Date(),  ".", fmt)
     },
     content = function(file) {
-      png(file, width = 800, height = 600)
+      open_graphics_device(
+        file,
+        format    = input$plot_format,
+        width_px  = input$plot_width,
+        height_px = input$plot_height,
+        res       = 96
+      )
       print(heatmap)
       dev.off()
     }

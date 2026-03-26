@@ -6,7 +6,7 @@ MiRQuest is an RShiny application for the analysis of microRNA-sequencing data. 
 
 ## Workflow Overview
 
-![miRQuest Workflow Diagram](mir_quest_workflow_diagram.jpeg)
+Please view the Quickstart tab in the app or read the tutorial in the `www` folder.
 
 ## Reproducibility
 
@@ -129,8 +129,8 @@ docker-compose down           # Stop
 ```bash
 git clone https://github.com/MSDLLCpapers/miRQuest.git
 cd miRQuest
-docker build -t mirquest:latest .                    # Build image (15-30 min)
-docker run -d -p 3838:3838 --name mirquest-app mirquest:latest  # Start
+docker build -t mirquest:v1.0.0 .                              # Build image (15-30 min)
+docker run -d -p 3838:3838 --name mirquest-app mirquest:v1.0.0 # Start
 # Access at http://localhost:3838
 docker logs -f mirquest-app                          # View logs
 docker stop mirquest-app                             # Stop
@@ -150,7 +150,7 @@ ports:
   - "8080:3838"  # Access at http://localhost:8080
 
 # Docker CLI:
-docker run -d -p 8080:3838 --name mirquest-app mirquest:latest
+docker run -d -p 8080:3838 --name mirquest-app mirquest:v1.0.0
 ```
 
 **Persistent Data Storage:**
@@ -161,13 +161,13 @@ volumes:
   - ./output:/app/output
 
 # Docker CLI:
-docker run -d -p 3838:3838 -v $(pwd)/output:/app/output mirquest:latest
+docker run -d -p 3838:3838 -v $(pwd)/output:/app/output mirquest:v1.0.0
 ```
 
 **Development Mode:**
 For development with live code reloading:
 ```bash
-docker run -d -p 3838:3838 -v $(pwd):/app mirquest:latest
+docker run -d -p 3838:3838 -v $(pwd):/app mirquest:v1.0.0
 ```
 
 #### Troubleshooting
@@ -178,13 +178,13 @@ docker run -d -p 3838:3838 -v $(pwd):/app mirquest:latest
 # Docker Desktop: Settings > Resources > Memory
 
 # Build fails: Clear cache and rebuild
-docker builder prune -a && docker build --no-cache -t mirquest:latest .
+docker builder prune -a && docker build --no-cache -t mirquest:v1.0.0 .
 
 # Network timeouts: Retry the build
 docker-compose build --no-cache
 
 # Timeout errors: Disable BuildKit
-DOCKER_BUILDKIT=0 docker build -t mirquest:latest .
+DOCKER_BUILDKIT=0 docker build -t mirquest:v1.0.0 .
 
 # Check build logs
 docker-compose build 2>&1 | tee build.log
@@ -198,7 +198,7 @@ lsof -i :3838  # Verify port not in use (macOS/Linux)
 netstat -ano | findstr :3838  # Windows
 
 # Port conflict: Use different port
-docker run -d -p 3839:3838 --name mirquest-app mirquest:latest
+docker run -d -p 3839:3838 --name mirquest-app mirquest:v1.0.0
 
 # Out of memory errors: Increase Docker memory limit to at least 4GB
 
@@ -208,34 +208,51 @@ docker run -d -p 3839:3838 --name mirquest-app mirquest:latest
 
 #### Archiving for Publications
 
+The Docker image associated with the paper *"MiRQuest: A user-friendly web app for the interactive analysis and visualization of microRNA sequencing data"* is tagged as **`mirquest:v1.0.0`** (label: `mirquest_v1.0.0`). This explicit tag ensures that the exact computational environment described in the paper can be rebuilt and archived independently of the `:latest` tag, which may change over time.
+
+**Build the publication image:**
+```bash
+git checkout v1.0.0                                  # Use the release tag
+docker build -t mirquest:v1.0.0 .                    # Build with explicit version tag
+```
+
 **Save Docker image for long-term archival:**
 ```bash
-docker build -t mirquest:1.0.0 .
-docker save mirquest:1.0.0 | gzip > mirquest-v1.0.0.tar.gz  # ~1.5-2.5 GB
+docker save mirquest:v1.0.0 | gzip > mirquest-v1.0.0.tar.gz  # ~1.5-2.5 GB
 sha256sum mirquest-v1.0.0.tar.gz > checksums.txt
 ```
 
 **Load archived image to reproduce results:**
 ```bash
 docker load < mirquest-v1.0.0.tar.gz
-docker run -d -p 3838:3838 --name mirquest-app mirquest:1.0.0
+docker run -d -p 3838:3838 --name mirquest-app mirquest:v1.0.0
 ```
 
-**Archive with publication:** Upload to [Zenodo](https://zenodo.org), [Figshare](https://figshare.com), or institutional repository along with:
-- This README.md
-- The Dockerfile
-- Git commit SHA/tag
+**Long-Term Archiving Guidance:**
+
+For publication-grade reproducibility, we recommend archiving the Docker image in a persistent repository that provides a DOI:
+
+1. **[Zenodo](https://zenodo.org)** (recommended) - Free, DOI-minting, supports files up to 50 GB, backed by CERN. Upload `mirquest-v1.0.0.tar.gz` and `checksums.txt`.
+2. **[Figshare](https://figshare.com)** - Free, DOI-minting, supports files up to 20 GB per file.
+3. **Institutional data repository** - Many universities and research institutions host long-term data archives.
+
+When archiving, include the following alongside the Docker image tarball:
+- `checksums.txt` (SHA-256 checksum for image integrity verification)
+- This `README.md`
+- The `Dockerfile`
+- The `renv.lock` file (R package versions)
+- Git release tag or commit SHA (e.g., `v1.0.0`)
 - Package version report (see Verifying Environment below)
 
 **Example Methods Section Citation:**
-> "Data analysis was performed using miRQuest v1.0 (GitHub: MSDLLCpapers/miRQuest, commit: [SHA]) in Docker (archived at Zenodo: [DOI]). The image contains R 4.4.2, Bioconductor 3.20, and exact package versions specified in the Dockerfile."
+> "Data analysis was performed using miRQuest v1.0.0 (Yang & Sauter et al.; GitHub: MSDLLCpapers/miRQuest, tag: v1.0.0) in a Docker container (archived at Zenodo: [DOI]). The image is based on Bioconductor RELEASE_3_20, containing R 4.4.2, Bioconductor 3.20, and exact package versions specified in the Dockerfile and renv.lock."
 
 #### Verifying Environment
 
 Generate a package version report for publication supplementary materials:
 
 ```bash
-docker run -d -p 3838:3838 --name mirquest-app mirquest:latest
+docker run -d -p 3838:3838 --name mirquest-app mirquest:v1.0.0
 docker exec mirquest-app Rscript -e "write.csv(installed.packages()[,c('Package','Version')], '/tmp/packages.csv')"
 docker cp mirquest-app:/tmp/packages.csv ./mirquest-package-versions.csv
 ```
@@ -256,6 +273,20 @@ docker cp mirquest-app:/tmp/packages.csv ./mirquest-package-versions.csv
 ---
 
 ## Sample Data
+
+The demo dataset included in `inst/data` was derived from TCGA-COAD and TCGA-READ colorectal cancer data. The script used to create it is available at `Data/make_demo_dataset.R`. Note that this script requires additional R packages **not included** in the app's `renv.lock` or Docker image, as they are only needed for data preparation and not for running miRQuest itself:
+
+- `TCGAbiolinks` - TCGA data retrieval
+- `SummarizedExperiment` - Bioconductor data structures
+- `miRBaseConverter` - miRNA ID conversion to mature miRBase v22
+- `caret` - classification utilities
+- `scutr` - Tomek link undersampling
+
+To install these packages for recreating the demo dataset:
+```R
+BiocManager::install(c("TCGAbiolinks", "SummarizedExperiment", "miRBaseConverter"))
+install.packages(c("caret", "scutr"))
+```
 
 See `inst/data` to view how sample input files should look like.
 

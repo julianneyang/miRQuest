@@ -55,6 +55,8 @@ observeEvent(input$runCorrelationAnalysis, {
 
   cor$P_adjust_corr <- stats::p.adjust(cor$`P-value(correlation)`)
  
+  # Store full correlation results for later use
+  cor_results_reactive(cor)
   
   neg_cor <- cor
   neg_cor <- dplyr::rename(neg_cor,ensembl_gene_id = Gene)
@@ -83,14 +85,133 @@ observeEvent(input$runCorrelationAnalysis, {
   
   output$NegativeCorrelationTable <- renderDT({
     if (!is.null(neg_cor)) {
-      datatable(neg_cor %>% 
+      datatable(neg_cor %>%
                   filter(P_adjust_corr < input$corr_padj_cutoff), rownames = FALSE, options = list(scrollX = TRUE, pageLength = 5))
     } else {
       return()
     }
   })
   
+  # Static Table Version for Paper
+  # output$NegativeCorrelationTable <- renderTable({
+  #   if (!is.null(neg_cor)) {
+  #     head(neg_cor %>% filter(P_adjust_corr < input$corr_padj_cutoff))
+  #   } else {
+  #     return()
+  #   }
+  # })
+  
+  # Clear any previous permutation result 
+  global_cor_perm_result(NULL)
+  
 })
+
+############################# 2026 NEWLY ADDED ###########################################
+
+observeEvent(input$runGlobalPermutation, {
+  if (is.null(cor_results_reactive())) {
+    showNotification("Please run the correlation analysis first.", type = "warning")
+    return()
+  }
+  
+  req(cor_results_reactive(), mrna_no_zero_reactive(), mirna_no_zero_reactive())
+  
+  cor          <- neg_cor_reactive()
+  mrna_no_zero <- mrna_no_zero_reactive()
+  mirna_no_zero <- mirna_no_zero_reactive()
+  
+  # Observed statistic
+  sig_neg <- cor %>%
+    dplyr::filter(Correlation < 0, P_adjust_corr < input$corr_padj_cutoff)
+  observed_stat <- nrow(sig_neg)
+  
+  n_perm <- input$n_perm_correlation
+  
+  # Expression matrices 
+  ncol_mrna <- ncol(mrna_no_zero)
+  ncol_mir  <- ncol(mirna_no_zero)
+  
+  mrna_expr  <- as.matrix(mrna_no_zero[, 1:(ncol_mrna - 5), drop = FALSE])
+  mirna_expr <- as.matrix(mirna_no_zero[, 1:(ncol_mir - 5), drop = FALSE])
+  
+  set.seed(123)
+  perm_stats <- numeric(n_perm)
+  
+  withProgress(message = "Running global permutation test...", value = 0, {
+    for (b in seq_len(n_perm)) {
+      incProgress(1 / n_perm, detail = paste("Permutation", b, "of", n_perm))
+      
+      perm_idx <- sample(ncol(mirna_expr))
+      mirna_perm <- mirna_expr[, perm_idx, drop = FALSE]
+      
+      mrna_perm_df <- mrna_no_zero
+      mirna_perm_df <- mirna_no_zero
+      mrna_perm_df[, 1:(ncol_mrna - 5)]  <- mrna_expr
+      mirna_perm_df[, 1:(ncol_mir - 5)]  <- mirna_perm
+      
+      cor_perm <- negative_cor(
+        mrna_data = mrna_perm_df,
+        mirna_data = mirna_perm_df,
+        cut.off    = 0,
+        method     = "spearman"
+      )
+      cor_perm <- as.data.frame(cor_perm)
+      cor_perm$Correlation   <- as.numeric(cor_perm$Correlation)
+      cor_perm$P_adjust_corr <- stats::p.adjust(cor_perm$`P-value(correlation)`, method = "BH")
+      
+      sig_neg_perm <- cor_perm %>%
+        dplyr::filter(Correlation < 0, P_adjust_corr < input$corr_padj_cutoff)
+      
+      perm_stats[b] <- nrow(sig_neg_perm)
+    }
+  })
+  
+  global_p_perm <- (sum(perm_stats >= observed_stat) + 1) / (n_perm + 1)
+  
+  global_cor_perm_result(list(
+    observed_stat = observed_stat,
+    perm_stats    = perm_stats,
+    n_perm        = n_perm,
+    p_value       = global_p_perm
+  ))
+  
+  output$GlobalPermutationSummary <- renderText({
+    res <- global_cor_perm_result()
+    if (is.null(res)) return("Run the global permutation test to see results.")
+    
+    interp <- if (res$p_value < 0.05) {
+      "There is a statistically significant enrichment of negative miRNA–mRNA correlations beyond random expectation."
+    } else {
+      "The overall number of negative miRNA–mRNA correlations could be explained by random association; individual pairs may still be of interest."
+    }
+    
+    null_vals <- res$perm_stats
+    null_min  <- min(null_vals)
+    null_max  <- max(null_vals)
+    null_mean <- mean(null_vals)
+    null_med  <- stats::median(null_vals)
+    
+    paste0(
+      "Global permutation test (", res$n_perm, " permutations)\n",
+      "Observed number of significantly negative miRNA–gene correlations ",
+      "(Correlation < 0 & BH-adjusted p < ", input$corr_padj_cutoff, "): ",
+      res$observed_stat, "\n",
+      "Null distribution (permuted data): min = ", null_min,
+      ", max = ", null_max,
+      ", mean = ", signif(null_mean, 3),
+      ", median = ", null_med, "\n",
+      "Global permutation p-value: ", signif(res$p_value, 3), "\n",
+      "Interpretation: ", interp
+    )
+  })
+  
+  
+  
+  
+  
+})
+
+#############################################################################
 
 observeEvent(input$show_database_support, {
   
@@ -134,6 +255,17 @@ observeEvent(input$show_database_support, {
       return()
     }
   })
+  
+  # Static table version for paper 
+  # output$SupportedNegativeCorrelationTable <- renderTable({
+  #   if (!is.null(identical_rows)) {
+  #    head(identical_rows)
+  #   } else {
+  #     return()
+  #   }
+  # })
+  
+  
   
 })
 
@@ -485,6 +617,8 @@ observeEvent(input$showGeneNetwork_Experimental, {
                      paste0("<b>Gene:</b> ", label, "<br><b>Degree (shown after filtering):</b> ", degree))
     )
   
+  # store exactly what will be plotted
+  corr_network_displayed(list(nodes = nodes, edges = edges))
   
   output$miRNAGeneNetwork_Experimental <- visNetwork::renderVisNetwork({
     visNetwork::visNetwork(nodes, edges, height = "700px", width = "100%") %>%
@@ -500,11 +634,28 @@ observeEvent(input$showGeneNetwork_Experimental, {
       visNetwork::visInteraction(hover = TRUE, dragNodes = TRUE, dragView = TRUE, zoomView = TRUE) %>%
       visNetwork::visIgraphLayout(randomSeed = 123)
   })
+  
+  ################################# NEW 2026 ######################################
+  output$corr_dl_network_nodes <- downloadHandler(
+    filename = function() paste0("corr_displayed_network_nodes_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(corr_network_displayed()$nodes)
+      readr::write_csv(corr_network_displayed()$nodes, file)
+    }
+  )
+  
+  output$corr_dl_network_edges <- downloadHandler(
+    filename = function() paste0("corr_displayed_network_edges_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(corr_network_displayed()$edges)
+      readr::write_csv(corr_network_displayed()$edges, file)
+    }
+  )
+  ##################################################################################
 })
 
 
 observeEvent(input$Pathway_ORA_Experimental, {
-  req(mrna_data_reactive(),upregulated_miRNA_reactive(),downregulated_miRNA_reactive(), supported_neg_cor_reactive(), neg_cor_reactive())
   
   if (is.null(neg_cor_reactive()) || is.null(supported_neg_cor_reactive())) {
     showNotification(
@@ -518,6 +669,9 @@ observeEvent(input$Pathway_ORA_Experimental, {
     )
     return()
   }
+  
+  req(mrna_data_reactive(),upregulated_miRNA_reactive(),downregulated_miRNA_reactive(), supported_neg_cor_reactive(), neg_cor_reactive())
+  
   
   pathway_notification <- showNotification("Looking for enriched pathways. This may take some time", type = "message", duration = NULL)
 
@@ -619,7 +773,7 @@ observeEvent(input$Pathway_ORA_Experimental, {
 
   ### RUN PATHWAY ORA ---
 
-  if (input$analysis_type == "GO") {
+  if (input$corr_analysis_type == "GO") {
     ora_results <- enrichGO(gene = target_genes,
                             universe = background_genes,
                             OrgDb = org_db(),
@@ -629,7 +783,7 @@ observeEvent(input$Pathway_ORA_Experimental, {
                             pvalueCutoff = input$corr_pathway_padj_cutoff,
                             qvalueCutoff = input$corr_pathway_padj_cutoff,
                             readable = TRUE)
-  } else if (input$analysis_type == "Reactome") {
+  } else if (input$corr_analysis_type == "Reactome") {
     ora_results <- enrichPathway(gene = target_genes,
                                  organism = organism_reactive(),
                                  pAdjustMethod = "BH",
@@ -712,6 +866,22 @@ observeEvent(input$Pathway_ORA_Experimental, {
       return()
     }
   })
+  
+  # Static table version for paper
+  # output$corr_pathway_ORA_table <- renderTable({
+  #   if (!is.null(as.data.frame(ora_results))) {
+  #     removeNotification(pathway_notification)
+  #     head(as.data.frame(ora_results))
+  #   } else {
+  #     removeNotification(pathway_notification)
+  #     DT::datatable(
+  #       data.frame(Message = "No enriched pathways found"),
+  #       rownames = FALSE,
+  #       options = list(scrollX = TRUE, pageLength = 5)
+  #     )
+  #     return()
+  #   }
+  # })
 
 })
 
@@ -792,6 +962,23 @@ observeEvent(input$corr_showChordPlot,{
   })
   
   corr_chord_plot_reactive(chord_plot)
+  
+  #################### NEW 2026 #####################
+  corr_chord_data_reactive(filtered_data)
+  
+  output$corr_downloadChordData <- downloadHandler(
+    filename = function() {
+      paste0("corr_chordplot_data_", Sys.Date(), ".csv")
+    },
+    content = function(file) {
+      df <- corr_chord_data_reactive()
+      req(df)
+      readr::write_csv(df, file)
+    }
+  )
+  
+  ###################################################
+  
 })
 
 
@@ -887,6 +1074,9 @@ observeEvent(input$corr_showNetworkPlot, {
                      paste0("<b>Pathway:</b> ", label, "<br><b>Degree (shown):</b> ", degree))
     )
   
+  # store exactly what will be plotted
+  path_corr_network_displayed(list(nodes = nodes, edges = edges))
+  
   # Render interactive network
   output$corr_networkPlot <- visNetwork::renderVisNetwork({
     visNetwork::visNetwork(nodes, edges, height = "700px", width = "100%") %>%
@@ -907,6 +1097,21 @@ observeEvent(input$corr_showNetworkPlot, {
       visNetwork::visIgraphLayout(randomSeed = 123)  # FR-like layout
   })
   
-  # to store the widget for reuse
-  #network_plot_reactive(NULL)  # or store nodes/edges if you need them elsewhere
+  ################################# NEW 2026 ######################################
+  output$path_corr_dl_network_nodes <- downloadHandler(
+    filename = function() paste0("path_corr_displayed_network_nodes_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(path_corr_network_displayed()$nodes)
+      readr::write_csv(path_corr_network_displayed()$nodes, file)
+    }
+  )
+  
+  output$path_corr_dl_network_edges <- downloadHandler(
+    filename = function() paste0("path_corr_displayed_network_edges_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(path_corr_network_displayed()$edges)
+      readr::write_csv(path_corr_network_displayed()$edges, file)
+    }
+  )
+  ##################################################################################
 })

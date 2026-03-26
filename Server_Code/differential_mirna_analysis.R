@@ -172,13 +172,13 @@ observeEvent(input$runDESeq, {
   
   DESEQ_obj(dds)
   
-  norm_cts <- vst(dds, blind = TRUE, nsub = sum( rowMeans( counts(dds, normalized=TRUE)) > 5 )) %>% assay()
-  norm_cts_reactive(norm_cts)
+  vst_cts <- vst(dds, blind = TRUE, nsub = sum( rowMeans( counts(dds, normalized=TRUE)) > 5 )) %>% assay()
+  vst_cts_reactive(vst_cts)
   
   heatmap_annotation <- as.data.frame(colData(dds)) %>%
     dplyr::select(c(input$voi))
   heatmap_annotation_reactive(heatmap_annotation)
-  #print(rownames(norm_cts))
+  #print(rownames(vst_cts))
   
   res <- DESeq2::results(dds, contrast = c(input$voi, setdiff(levels(metadataData[[input$voi]]), input$voiRef)[1], input$voiRef))  # CHANGED
   
@@ -260,6 +260,7 @@ observeEvent(input$runDESeq, {
   idx <- which(p_adjust < input$DEM_padj_filter)
   
   norm_cts <- counts(dds, normalized = TRUE) %>% as.data.frame
+ 
   #DE_data <- countData[idx, ]
   DE_data <- norm_cts[idx, ]
   
@@ -332,10 +333,17 @@ observeEvent(input$runDESeq, {
   
   output$downloadBoxplot <- downloadHandler(
     filename = function() {
-      paste("boxplot_", input$selectedMiRNA, ".png", sep = "")
+      fmt <- input$plot_format
+      paste0("boxplot_", input$selectedMiRNA, ".", fmt)
     },
     content = function(file) {
-      png(file)
+      open_graphics_device(
+        file,
+        format    = input$plot_format,
+        width_px  = input$plot_width,
+        height_px = input$plot_height,
+        res       = 96
+      )
       dds <- DESEQ_obj()
       selected_miRNA <- input$selectedMiRNA
       grouping_variable <- input$groupBy_Boxplot
@@ -344,6 +352,21 @@ observeEvent(input$runDESeq, {
       dev.off()
     }
   )
+  
+  output$download_plotCounts_selected <- downloadHandler(
+    filename = function() paste0("plotCounts_", input$selectedMiRNA, "_", Sys.Date(), ".csv"),
+    content  = function(file) {
+      req(DESEQ_obj(), input$selectedMiRNA, input$groupBy_Boxplot)
+      df <- DESeq2::plotCounts(
+        dds = DESEQ_obj(),
+        gene = input$selectedMiRNA,
+        intgroup = input$groupBy_Boxplot,
+        returnData = TRUE
+      )
+      utils::write.csv(df, file, row.names = FALSE, quote = FALSE)
+    }
+  )
+  
   
   
   # Data processing msg:
@@ -395,27 +418,27 @@ observeEvent(input$runDESeq, {
 
 
 # Populate the selectable miRNA list from normalized counts (safer for heatmap rows)
-observeEvent(norm_cts_reactive(), {
-  req(norm_cts_reactive())
-  norm_cts <- norm_cts_reactive()
+observeEvent(vst_cts_reactive(), {
+  req(vst_cts_reactive())
+  vst_cts <- vst_cts_reactive()
   updateSelectizeInput(
     session,
     inputId = "heatmap_select_rows",
-    choices = rownames(norm_cts),
+    choices = rownames(vst_cts),
     server = TRUE
   )
 })
 
 observeEvent(input$significant_heatmap_button, {
-  req(norm_cts_reactive(), res_significant(),heatmap_annotation_reactive())
+  req(vst_cts_reactive(), res_significant(),heatmap_annotation_reactive())
   
   res_significant_data <- res_significant()
-  norm_cts <- norm_cts_reactive()
+  vst_cts <- vst_cts_reactive()
   heatmap_annotation <- heatmap_annotation_reactive()
   
   # If user specified rows, use them; otherwise fall back to "significant" logic
   user_selected <- input$heatmap_select_rows
-  valid_user_selected <- intersect(user_selected %||% character(0), rownames(norm_cts))
+  valid_user_selected <- intersect(user_selected %||% character(0), rownames(vst_cts))
   
   # Warn about any invalid entries
   if (!is.null(user_selected) && length(setdiff(user_selected, valid_user_selected)) > 0) {
@@ -462,7 +485,7 @@ observeEvent(input$significant_heatmap_button, {
       return()
     }
     
-    selected_present <- intersect(rownames(norm_cts), select_significant)
+    selected_present <- intersect(rownames(vst_cts), select_significant)
   }
   
   # Guard for empty selection
@@ -474,12 +497,12 @@ observeEvent(input$significant_heatmap_button, {
     return()
   }
   
-  subset_norm_cts <- norm_cts[selected_present, , drop = FALSE]
+  subset_vst_cts <- vst_cts[selected_present, , drop = FALSE]
   
-  do_cluster_rows <- nrow(subset_norm_cts) >= 2
+  do_cluster_rows <- nrow(subset_vst_cts) >= 2
   
   heatmap_significant <- pheatmap::pheatmap(
-    subset_norm_cts,
+    subset_vst_cts,
     annotation_col = heatmap_annotation,
     scale = "row",
     cluster_rows = do_cluster_rows,
@@ -489,8 +512,25 @@ observeEvent(input$significant_heatmap_button, {
   )
   
   output$significant_miRNA_heatmap <- renderPlot({ heatmap_significant })
+  
   significant_heatmap_reactive(heatmap_significant)
+  
+  # NEW 2026 enable data download 
+  subset_vst_cts_scaled <- t(scale(t(subset_vst_cts)))
+  heatmap_mat_plotted_reactive(as.data.frame(subset_vst_cts_scaled))
+  
+  output$download_heatmap_matrix <- downloadHandler(
+    filename = function() paste0("significant_miRNA_heatmap_matrix_as_plotted_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(heatmap_mat_plotted_reactive())
+      out <- heatmap_mat_plotted_reactive() |> tibble::rownames_to_column("miRNA")
+      write.csv(out, file, row.names = FALSE, quote = FALSE)
+    }
+  )
+
 })
+
+  
 
 
 # After DE_miRNA_results_reactive() becomes available, populate label choices

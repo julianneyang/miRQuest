@@ -698,6 +698,9 @@ observeEvent(input$showGeneNetwork, {
                      paste0("<b>Gene:</b> ", label, "<br><b>Degree (shown after filtering):</b> ", degree))
     )
   
+  # store exactly what will be plotted
+  network_displayed(list(nodes = nodes, edges = edges))
+  
   output$miRNAGeneNetwork <- visNetwork::renderVisNetwork({
     visNetwork::visNetwork(nodes, edges, height = "700px", width = "100%") %>%
       visNetwork::visNodes(shape = "dot", size = 18, font = list(size = 18)) %>%
@@ -712,6 +715,24 @@ observeEvent(input$showGeneNetwork, {
       visNetwork::visInteraction(hover = TRUE, dragNodes = TRUE, dragView = TRUE, zoomView = TRUE) %>%
       visNetwork::visIgraphLayout(randomSeed = 123)
   })
+  
+  ######################## NEW 2026 ################################
+  output$dl_network_nodes <- downloadHandler(
+    filename = function() paste0("displayed_network_nodes_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(network_displayed()$nodes)
+      readr::write_csv(network_displayed()$nodes, file)
+    }
+  )
+  
+  output$dl_network_edges <- downloadHandler(
+    filename = function() paste0("displayed_network_edges_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(network_displayed()$edges)
+      readr::write_csv(network_displayed()$edges, file)
+    }
+  )
+  ###################################################################
 })
 
 observeEvent(input$runORA, {

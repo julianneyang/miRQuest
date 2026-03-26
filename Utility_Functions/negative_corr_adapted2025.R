@@ -29,23 +29,30 @@ negative_cor <- function(
         for (j in seq_len(nrow(data_2))) {
           mrna <- as.numeric(data_1[i, 1:(ncol(mrna_data) - 5)])
           mirna <- as.numeric(data_2[j, 1:(ncol(mirna_data) - 5)])
-          tmp <- stats::cor(mrna, mirna, method = method)
+           # tmp <- stats::cor(mrna, mirna, method = method)
           
           valid <- !(is.na(mrna) | is.na(mirna))    
           x <- mrna[valid]                          
           y <- mirna[valid]                         
           
           # Ensure enough data points for cor.test and use cor.test
-          if (length(x) >= 3) {                                                    
-            test <- try(stats::cor.test(x, y, method = method), silent = TRUE)     
+          if (length(x) >= 3) {                  
+            
+            test <- try(
+              suppressWarnings(                    # NEW: suppress warnings from cor.test
+                stats::cor.test(x, y, method = method)
+              ),
+              silent = TRUE
+            ) 
+            
             if (inherits(test, "try-error")) {                                     
               next                                                                  
             }                                                                       
             tmp  <- unname(test$estimate)           
             pval <- test$p.value                     
             
-            print(paste0("The row indices are ", i, " for mrna, and ", j, " for mirna"))
-            print(tmp)
+            #print(paste0("The row indices are ", i, " for mrna, and ", j, " for mirna"))
+            #print(tmp)
             
             if (tmp < cor_cut) {
               # MODIFIED: Insert pval as a new element (4th position) in the stored result
