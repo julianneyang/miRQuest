@@ -4789,7 +4789,7 @@
       }
     },
     "plogr": {
-      "Source": "RSPM",
+      "Source": "CRAN",
       "Repository": null,
       "description": {
         "Package": "plogr",
@@ -6979,7 +6979,7 @@
       "checksum": "b7499691d8f35e24e40783aaba90f7b8"
     },
     "manifest.json": {
-      "checksum": "da530fa85d73e3b0957c6225e29ecea2"
+      "checksum": "c503bdee28af428699e25b7b2259c6e6"
     },
     "mir_quest_workflow_diagram.jpeg": {
       "checksum": "7afe813aa24655873569d8618ad2da32"
@@ -7009,7 +7009,7 @@
       "checksum": "6cd60c0556d6006b31934abf8feeebf6"
     },
     "renv.lock": {
-      "checksum": "5d8e17ddf70b4e18465b1f74aeae0ead"
+      "checksum": "449e491502cc66b0b867e51e278b245b"
     },
     "renv.lock.backup": {
       "checksum": "6cd60c0556d6006b31934abf8feeebf6"
